@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Greyhound Race Simulator</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; background: #f3f4f6; }
+    h2 { margin-bottom: 10px; }
+    select, button { margin: 10px 0; padding: 8px; font-size: 16px; }
+    button { cursor: pointer; background: #2563eb; color: white; border: none; border-radius: 4px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 20px; background: white; border-radius: 8px; overflow: hidden; }
+    th, td { border: 1px solid #e5e7eb; padding: 10px; text-align: center; font-size: 14px; }
+    th { background-color: #f9fafb; }
+    #loading { margin-top: 10px; font-weight: bold; color: #dc2626; display: none; }
+    .bar-container {
+      display: grid;
+      grid-template-columns: 40px 150px auto;
+      margin-top: 30px;
+      padding: 20px;
+      gap: 10px 10px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      background-color: white;
+      font-size: 14px;
+    }
+    .bar-label {
+      text-align: right;
+      font-weight: 600;
+      color: #374151;
+    }
+    .bar-name {
+      text-align: left;
+      font-weight: 600;
+      color: #111827;
+    }
+    .bar {
+      height: 20px;
+      background: linear-gradient(90deg, #3b82f6 0%, #60a5fa 100%);
+      color: white;
+      text-align: right;
+      padding-right: 8px;
+      line-height: 20px;
+      min-width: 1%;
+      border-radius: 4px;
+      font-weight: bold;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <h2>Greyhound Race Simulator</h2>
+
+  <label for="trackSelect">Select Track:</label>
+  <select id="trackSelect"></select>
+
+  <label for="raceSelect">Select Race:</label>
+  <select id="raceSelect"></select>
+  <button onclick="simulateRace(100)">Simulate Race</button>
+
+  <div id="loading">Running simulation...</div>
+
+  <table id="resultsTable" style="display:none;">
+    <thead>
+      <tr>
+        <th>Box</th>
+        <th>Dog</th>
+        <th>Avg Position</th>
+        <th>Rated Price</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <div id="barGraph" class="bar-container"></div>
+
+  <script>
+    const races = {};
+    let currentRace = [];
+
+    async function loadCSV() {
+      const response = await fetch('RACE_CARD.csv');
+      const text = await response.text();
+      const rows = text.trim().split('\n').map(r => r.split(','));
+      const headers = rows.shift().map(h => h.trim());
+
+      const data = rows.map(r => {
+        const obj = {};
+        headers.forEach((h, i) => {
+          obj[h] = r[i] ? r[i].trim() : '';
+        });
+        return obj;
+      });
+
+      data.forEach(dog => {
+        const raceId = dog['RACE ID'];
+        if (!races[raceId]) races[raceId] = [];
+        const rawProb = dog['PROBABILITY %'].replace('%', '');
+        dog['PROBABILITY %'] = parseFloat(rawProb);
+        dog['RATED PRICE'] = parseFloat(dog['RATED PRICE']);
+        dog['RUG'] = parseInt(dog['RUG']);
+        races[raceId].push(dog);
+      });
+
+      const trackSelect = document.getElementById('trackSelect');
+      const raceSelect = document.getElementById('raceSelect');
+      const trackMap = {};
+
+      Object.entries(races).forEach(([raceId, runners]) => {
+        const race = runners[0];
+        const track = race['TRACK'];
+        const label = `${race['RACE']}`;
+        if (!trackMap[track]) trackMap[track] = [];
+        trackMap[track].push({ raceId, label });
+      });
+
+      Object.keys(trackMap).forEach(track => {
+        const option = document.createElement('option');
+        option.value = track;
+        option.textContent = track;
+        trackSelect.appendChild(option);
+      });
+
+      trackSelect.addEventListener('change', () => {
+        const selectedTrack = trackSelect.value;
+        raceSelect.innerHTML = '';
+        trackMap[selectedTrack].forEach(({ raceId, label }) => {
+          raceSelect.innerHTML += `<option value="${raceId}">${label}</option>`;
+        });
+        raceSelect.dispatchEvent(new Event('change'));
+      });
+
+      raceSelect.addEventListener('change', e => {
+        currentRace = races[e.target.value];
+      });
+
+      trackSelect.dispatchEvent(new Event('change'));
+    }
+
+    function getRugStyle(rug) {
+      const styles = [
+        { bg: 'red', color: 'white' },
+        { bg: 'black', color: 'white' },
+        { bg: 'white', color: 'black' },
+        { bg: 'blue', color: 'white' },
+        { bg: 'yellow', color: 'black' },
+        { bg: 'green', color: 'white' },
+        { bg: 'repeating-linear-gradient(45deg, black, black 10px, white 10px, white 20px)', color: 'white' },
+        { bg: 'pink', color: 'black' }
+      ];
+      return rug >= 1 && rug <= 8 ? styles[rug - 1] : { bg: 'purple', color: 'black' };
+    }
+
+    function simulateRace(n = 1000) {
+      if (!currentRace || currentRace.length === 0) {
+        alert("No race data loaded. Please select a race.");
+        return;
+      }
+
+      document.getElementById('loading').style.display = 'block';
+      setTimeout(() => runSimulation(n), 50);
+    }
+
+    function runSimulation(n) {
+      const results = {};
+      const dogs = currentRace.map(d => d.NAME);
+      const probs = currentRace.map(d => d['PROBABILITY %']);
+      const ratedPrices = Object.fromEntries(currentRace.map(d => [d.NAME, d['RATED PRICE']]));
+      const rugNumbers = Object.fromEntries(currentRace.map(d => [d.NAME, d['RUG']]));
+
+      const total = probs.reduce((a, b) => a + b, 0);
+      const normProbs = probs.map(p => p / total);
+
+      dogs.forEach(d => results[d] = { wins: 0, positions: [], margin: 0 });
+
+      for (let i = 0; i < n; i++) {
+        const picked = weightedSample(dogs, normProbs);
+        picked.forEach((dog, idx) => {
+          results[dog].positions.push(idx + 1);
+          if (idx === 0) results[dog].wins++;
+          results[dog].margin += idx === 0 ? 0 : Math.max(0, (1 + idx * 0.25) + randn_bm() * 0.2);
+        });
+      }
+
+      const summary = Object.entries(results).map(([dog, stat]) => {
+        return {
+          dog,
+          rug: rugNumbers[dog],
+          avgPos: (stat.positions.reduce((a, b) => a + b, 0) / n).toFixed(2),
+          winPct: (stat.wins / n) * 100,
+          ratedPrice: ratedPrices[dog]
+        };
+      });
+
+      summary.sort((a, b) => a.rug - b.rug);
+
+      const tbody = document.querySelector('#resultsTable tbody');
+      tbody.innerHTML = '';
+      summary.forEach(stat => {
+        const style = getRugStyle(stat.rug);
+        const boxHTML = `<div style="width:28px;height:28px;margin:auto;border-radius:4px;background:${style.bg};color:${style.color};display:flex;align-items:center;justify-content:center;font-weight:bold;">${stat.rug}</div>`;
+        tbody.innerHTML += `<tr><td>${boxHTML}</td><td>${stat.dog}</td><td>${stat.avgPos}</td><td>${stat.ratedPrice}</td></tr>`;
+      });
+
+      document.getElementById('resultsTable').style.display = '';
+      document.getElementById('loading').style.display = 'none';
+
+      const barGraph = document.getElementById('barGraph');
+      barGraph.innerHTML = '';
+      const maxWin = Math.max(...summary.map(s => s.winPct));
+      summary.forEach(stat => {
+        const width = (stat.winPct / maxWin) * 100;
+        barGraph.innerHTML += `
+          <div class="bar-label">${stat.rug}</div>
+          <div class="bar-name">${stat.dog}</div>
+          <div class="bar" style="width:${width.toFixed(1)}%">${stat.winPct.toFixed(1)}%</div>`;
+      });
+    }
+
+    function weightedSample(items, weights) {
+      const result = [];
+      const remaining = [...items];
+      const remWeights = [...weights];
+
+      while (remaining.length) {
+        const sum = remWeights.reduce((a, b) => a + b, 0);
+        let r = Math.random() * sum;
+        let idx = 0;
+        while (r > remWeights[idx]) {
+          r -= remWeights[idx];
+          idx++;
+        }
+        result.push(remaining[idx]);
+        remaining.splice(idx, 1);
+        remWeights.splice(idx, 1);
+      }
+      return result;
+    }
+
+    function randn_bm() {
+      let u = 0, v = 0;
+      while (u === 0) u = Math.random();
+      while (v === 0) v = Math.random();
+      return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+    }
+
+    loadCSV();
+  </script>
+</body>
+</html>
