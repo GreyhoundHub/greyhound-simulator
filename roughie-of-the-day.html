@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Roughie of the Day</title>
+  <style>
+    body { font-family: sans-serif; padding: 40px; background: #f8fafc; color: #111827; max-width: 700px; margin: auto; }
+    h2 { font-size: 1.8em; color: #a16207; }
+    .highlight { font-weight: bold; color: #a16207; }
+  </style>
+</head>
+<body>
+  <h2>🐕 Roughie of the Day – <span id="today"></span></h2>
+  <div id="roughie"></div>
+
+  <script>
+    document.getElementById("today").textContent = new Date().toLocaleDateString();
+    const CSV_URL = "https://raw.githubusercontent.com/GreyhoundHub/greyhound-simulator/main/RACE_CARD.csv";
+
+    fetch(CSV_URL)
+      .then(res => res.text())
+      .then(text => {
+        const [headerLine, ...lines] = text.trim().split("\n");
+        const headers = headerLine.split(",").map(h => h.trim());
+        let roughie = null;
+
+        lines.forEach(line => {
+          const values = line.split(",");
+          const row = {};
+          headers.forEach((h, i) => row[h] = values[i]?.trim());
+          row['RATED PRICE'] = parseFloat(row['RATED PRICE']);
+          row['PROBABILITY %'] = parseFloat(row['PROBABILITY %'].replace('%', ''));
+          if (row['RATED PRICE'] >= 10 && row['PROBABILITY %'] >= 10) {
+            if (!roughie || row['PROBABILITY %'] > roughie['PROBABILITY %']) {
+              roughie = row;
+            }
+          }
+        });
+
+        const el = document.getElementById("roughie");
+        if (roughie) {
+          el.innerHTML = `
+            <p>
+              ${roughie.TRACK} R${roughie.RACE} – <span class="highlight">${roughie.NAME}</span><br>
+              Rated Price: $${roughie['RATED PRICE'].toFixed(2)}<br>
+              Model Win %: ${roughie['PROBABILITY %'].toFixed(1)}%
+            </p>`;
+        } else {
+          el.innerHTML = '<p>No suitable roughie found today.</p>';
+        }
+      })
+      .catch(err => {
+        document.getElementById("roughie").innerHTML = `<p>Error loading roughie: ${err.message}</p>`;
+      });
+  </script>
+</body>
+</html>
