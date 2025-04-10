@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Lay of the Day</title>
+  <style>
+    body { font-family: sans-serif; padding: 40px; background: #f8fafc; color: #111827; max-width: 700px; margin: auto; }
+    h2 { font-size: 1.8em; color: #dc2626; }
+    .highlight { font-weight: bold; color: #dc2626; }
+  </style>
+</head>
+<body>
+  <h2>❌ Lay of the Day – <span id="today"></span></h2>
+  <div id="lay"></div>
+
+  <script>
+    document.getElementById("today").textContent = new Date().toLocaleDateString();
+    const CSV_URL = "https://raw.githubusercontent.com/GreyhoundHub/greyhound-simulator/main/RACE_CARD.csv";
+
+    fetch(CSV_URL)
+      .then(res => res.text())
+      .then(text => {
+        const [headerLine, ...lines] = text.trim().split("\n");
+        const headers = headerLine.split(",").map(h => h.trim());
+        let lay = null;
+
+        lines.forEach(line => {
+          const values = line.split(",");
+          const row = {};
+          headers.forEach((h, i) => row[h] = values[i]?.trim());
+          row['PROBABILITY %'] = parseFloat(row['PROBABILITY %'].replace('%', ''));
+          row['MARKET PRICE'] = parseFloat(row['MARKET PRICE']) || null;
+          if (row['MARKET PRICE'] && row['MARKET PRICE'] < 3 && row['PROBABILITY %'] < 20) {
+            lay = row;
+          }
+        });
+
+        const el = document.getElementById("lay");
+        if (lay) {
+          el.innerHTML = `
+            <p>
+              ${lay.TRACK} R${lay.RACE} – <span class="highlight">${lay.NAME}</span><br>
+              Market Price: $${lay['MARKET PRICE'].toFixed(2)}<br>
+              Model Win %: ${lay['PROBABILITY %'].toFixed(1)}%
+            </p>`;
+        } else {
+          el.innerHTML = '<p>No clear lay found today.</p>';
+        }
+      })
+      .catch(err => {
+        document.getElementById("lay").innerHTML = `<p>Error loading lay: ${err.message}</p>`;
+      });
+  </script>
+</body>
+</html>

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Top 3 Picks</title>
+  <style>
+    body { font-family: sans-serif; padding: 40px; background: #f8fafc; color: #111827; max-width: 700px; margin: auto; }
+    h2 { font-size: 1.8em; color: #2563eb; }
+    ul { padding-left: 20px; }
+    li { margin: 8px 0; }
+    .highlight { font-weight: bold; color: #059669; }
+  </style>
+</head>
+<body>
+  <h2>🐾 Top 3 Picks – <span id="today"></span></h2>
+  <ul id="top3"></ul>
+
+  <script>
+    document.getElementById("today").textContent = new Date().toLocaleDateString();
+    const CSV_URL = "https://raw.githubusercontent.com/GreyhoundHub/greyhound-simulator/main/RACE_CARD.csv";
+
+    fetch(CSV_URL)
+      .then(res => res.text())
+      .then(text => {
+        const [headerLine, ...lines] = text.trim().split("\n");
+        const headers = headerLine.split(",").map(h => h.trim());
+        const data = lines.map(line => {
+          const values = line.split(",");
+          const row = {};
+          headers.forEach((h, i) => row[h] = values[i]?.trim());
+          row['PROBABILITY %'] = parseFloat(row['PROBABILITY %'].replace('%', ''));
+          return row;
+        });
+        return data.sort((a, b) => b['PROBABILITY %'] - a['PROBABILITY %']).slice(0, 3);
+      })
+      .then(top3 => {
+        const ul = document.getElementById("top3");
+        top3.forEach((dog, i) => {
+          ul.innerHTML += `<li><span class="highlight">${i + 1}.</span> ${dog.TRACK} R${dog.RACE} – ${dog.NAME} (Win %: ${dog['PROBABILITY %'].toFixed(1)}%)</li>`;
+        });
+      })
+      .catch(err => {
+        document.getElementById("top3").innerHTML = `<li>Error loading tips: ${err.message}</li>`;
+      });
+  </script>
+</body>
+</html>
