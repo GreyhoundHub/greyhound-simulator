@@ -12,7 +12,7 @@
   </style>
 </head>
 <body>
-  <h2>🐾 Top 3 Picks – <span id="today"></span></h2>
+  <h2>Top 3 Picks – <span id="today"></span></h2>
   <ul id="top3"></ul>
 
   <script>
@@ -32,52 +32,54 @@
       });
     }
 
-    function findTopPicks(data) {
-      const grouped = {};
+    function findTop3Picks(data) {
+      const groupedByRace = {};
       data.forEach(dog => {
         const raceId = dog['RACE ID'];
-        if (!grouped[raceId]) grouped[raceId] = [];
-        grouped[raceId].push(dog);
+        if (!groupedByRace[raceId]) groupedByRace[raceId] = [];
+        groupedByRace[raceId].push(dog);
       });
 
-      let topPicks = [];
-      let gap = 4.0;
+      let picks = [];
+      let minGap = 4.0;
 
-      while (topPicks.length < 3 && gap >= 3.0) {
-        topPicks = [];
-        Object.values(grouped).forEach(race => {
+      while (picks.length < 3 && minGap >= 3.5) {
+        picks = [];
+        Object.values(groupedByRace).forEach(race => {
           const sorted = race.filter(d => !isNaN(d['RATED PRICE'])).sort((a, b) => a['RATED PRICE'] - b['RATED PRICE']);
           if (sorted.length < 2) return;
+
           const fav = sorted[0];
-          const second = sorted[1];
-          const priceGap = second['RATED PRICE'] - fav['RATED PRICE'];
-          const isEligibleRug = [1, 2, 8].includes(fav['RUG']);
-          if (priceGap >= gap && isEligibleRug) {
-            topPicks.push(fav);
+          const secondFav = sorted[1];
+          const gap = secondFav['RATED PRICE'] - fav['RATED PRICE'];
+
+          if ([1, 2, 8].includes(fav['RUG']) && gap >= minGap) {
+            picks.push(fav);
           }
         });
-        if (topPicks.length < 3) gap -= 0.5;
+        if (picks.length < 3) minGap = 3.5; // fallback to smaller gap
       }
 
-      return topPicks.slice(0, 3);
+      picks.sort((a, b) => a['RATED PRICE'] - b['RATED PRICE']);
+      return picks.slice(0, 3);
     }
 
     fetch(CSV_URL)
       .then(res => res.text())
       .then(parseCSV)
-      .then(findTopPicks)
+      .then(findTop3Picks)
       .then(top3 => {
         const ul = document.getElementById("top3");
         if (top3.length === 0) {
-          ul.innerHTML = '<li>No suitable top picks found.</li>';
+          ul.innerHTML = '<li>No qualifying top picks found.</li>';
         } else {
           top3.forEach((dog, i) => {
-            ul.innerHTML += `<li><span class="highlight">${i + 1}.</span> ${dog.TRACK} R${dog.RACE} – ${dog.NAME} (Rated Price: $${dog['RATED PRICE'].toFixed(2)}, Rug: ${dog['RUG']})</li>`;
+            ul.innerHTML += `<li><span class="highlight">${i + 1}.</span> ${dog.TRACK} R${dog.RACE} – ${dog.NAME} (Rug ${dog.RUG}, Rated Price: $${dog['RATED PRICE'].toFixed(2)})</li>`;
           });
         }
       })
       .catch(err => {
-        document.getElementById("top3").innerHTML = `<li>Error loading tips: ${err.message}</li>`;
+        document.getElementById("top3").innerHTML = `<li>Error loading picks: ${err.message}</li>`;
       });
   </script>
 </body>
