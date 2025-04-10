@@ -4,16 +4,29 @@
   <meta charset="UTF-8">
   <title>Top 3 Picks</title>
   <style>
-    body { font-family: sans-serif; padding: 40px; background: #f8fafc; color: #111827; max-width: 700px; margin: auto; }
-    h2 { font-size: 1.8em; color: #2563eb; }
-    ul { padding-left: 20px; }
-    li { margin: 8px 0; }
+    body { font-family: sans-serif; padding: 40px; background: #f8fafc; color: #111827; max-width: 800px; margin: auto; }
+    h2 { font-size: 1.8em; color: #2563eb; margin-bottom: 20px; }
+    table { border-collapse: collapse; width: 100%; background: white; }
+    th, td { padding: 12px 16px; border-bottom: 1px solid #e5e7eb; text-align: left; }
+    th { background-color: #f1f5f9; color: #1e293b; }
     .highlight { font-weight: bold; color: #059669; }
   </style>
 </head>
 <body>
   <h2>Top 3 Picks – <span id="today"></span></h2>
-  <ul id="top3"></ul>
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Track</th>
+        <th>Race</th>
+        <th>Dog</th>
+        <th>Rug</th>
+        <th>Rated Price</th>
+      </tr>
+    </thead>
+    <tbody id="top3"></tbody>
+  </table>
 
   <script>
     document.getElementById("today").textContent = new Date().toLocaleDateString();
@@ -57,7 +70,7 @@
             picks.push(fav);
           }
         });
-        if (picks.length < 3) minGap = 3.5; // fallback to smaller gap
+        if (picks.length < 3) minGap = 3.5;
       }
 
       picks.sort((a, b) => a['RATED PRICE'] - b['RATED PRICE']);
@@ -69,17 +82,25 @@
       .then(parseCSV)
       .then(findTop3Picks)
       .then(top3 => {
-        const ul = document.getElementById("top3");
+        const tbody = document.getElementById("top3");
         if (top3.length === 0) {
-          ul.innerHTML = '<li>No qualifying top picks found.</li>';
+          tbody.innerHTML = '<tr><td colspan="6">No qualifying top picks found.</td></tr>';
         } else {
           top3.forEach((dog, i) => {
-            ul.innerHTML += `<li><span class="highlight">${i + 1}.</span> ${dog.TRACK} R${dog.RACE} – ${dog.NAME} (Rug ${dog.RUG}, Rated Price: $${dog['RATED PRICE'].toFixed(2)})</li>`;
+            tbody.innerHTML += `
+              <tr>
+                <td class="highlight">${i + 1}</td>
+                <td>${dog.TRACK}</td>
+                <td>${dog.RACE}</td>
+                <td>${dog.NAME}</td>
+                <td>${dog.RUG}</td>
+                <td>$${dog['RATED PRICE'].toFixed(2)}</td>
+              </tr>`;
           });
         }
       })
       .catch(err => {
-        document.getElementById("top3").innerHTML = `<li>Error loading picks: ${err.message}</li>`;
+        document.getElementById("top3").innerHTML = `<tr><td colspan="6">Error loading picks: ${err.message}</td></tr>`;
       });
   </script>
 </body>
